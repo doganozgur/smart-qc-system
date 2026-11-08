@@ -9,32 +9,39 @@ import sys
 import subprocess
 import shutil
 
+# Ensure UTF-8 console output on Windows
+if sys.stdout.encoding != 'utf-8':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
+
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 
 
 def build():
     print("=" * 60)
-    print("  SmartVisionQC Windows .EXE Derleme Aracı")
+    print("  SmartVisionQC Windows .EXE Build Tool")
     print("=" * 60)
 
     # 1. Check PyInstaller
     try:
         import PyInstaller
-        print(f"✔ PyInstaller kurulu (Versiyon: {PyInstaller.__version__})")
+        print(f"PyInstaller version: {PyInstaller.__version__}")
     except ImportError:
-        print("⚡ PyInstaller kuruluyor...")
+        print("Installing PyInstaller...")
         subprocess.check_call([sys.executable, "-m", "pip", "install", "pyinstaller"])
 
     # 2. Clean previous build artifacts
     for d in ["build", "dist"]:
         path = os.path.join(PROJECT_ROOT, d)
         if os.path.exists(path):
-            print(f"🧹 Eski {d}/ klasörü temizleniyor...")
+            print(f"Cleaning {d}/ directory...")
             shutil.rmtree(path, ignore_errors=True)
 
     # 3. Execute PyInstaller
     spec_path = os.path.join(PROJECT_ROOT, "SmartVisionQC.spec")
-    print(f"🚀 PyInstaller ile .EXE oluşturuluyor ({spec_path})...")
+    print(f"Building .EXE with PyInstaller ({spec_path})...")
 
     cmd = [
         sys.executable, "-m", "PyInstaller",
@@ -46,9 +53,9 @@ def build():
     dist_folder = os.path.join(PROJECT_ROOT, "dist", "SmartVisionQC")
     exe_path = os.path.join(dist_folder, "SmartVisionQC.exe")
     print("=" * 60)
-    print("🎉 DERLEME BAŞARIYLA TAMAMLANDI!")
-    print(f"📂 Çıktı Klasörü: {dist_folder}")
-    print(f"🖥 Çalıştırılabilir Dosya: {exe_path}")
+    print("BUILD COMPLETED SUCCESSFULLY!")
+    print(f"Output Directory: {dist_folder}")
+    print(f"Executable File: {exe_path}")
     print("=" * 60)
 
 
