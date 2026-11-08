@@ -9,7 +9,7 @@ import sys
 import subprocess
 import shutil
 
-# Ensure UTF-8 console output on Windows
+# Force UTF-8 encoding on standard output
 if sys.stdout.encoding != 'utf-8':
     try:
         sys.stdout.reconfigure(encoding='utf-8')
