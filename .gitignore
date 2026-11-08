@@ -1,0 +1,26 @@
+# Virtual environment
+.venv/
+venv/
+ENV/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# PyInstaller build artifacts
+build/
+dist/
+*.manifest
+*.spec.bak
+
+# Local databases & logs
+*.log
+data/test_*.db
+data/test_report.csv
+
+# macOS metadata
+.DS_Store
+.AppleDouble
+.LSOverride
