@@ -16,8 +16,14 @@ GOLDEN_PATH = os.path.join(MOCK_DIR, "golden_reference.png")
 
 
 def run_tests():
+    if os.path.exists(DB_PATH):
+        try:
+            os.remove(DB_PATH)
+        except OSError:
+            pass
+
     print("=== 1. Vision Pipeline Initializing ===")
-    pipeline = VisionQCPipeline(GOLDEN_PATH)
+    pipeline = VisionQCPipeline(GOLDEN_PATH, mode="pcb")
     learner = ActiveLearner(DB_PATH, pipeline)
     print("Pipeline ready with golden reference.")
 

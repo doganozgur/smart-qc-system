@@ -5,8 +5,9 @@ Test SQLite Inspection Database Logging & CSV Export.
 import os
 from core.database import InspectionDatabase
 
-DB_PATH = "/Users/doganozgur/.gemini/antigravity/scratch/smart_qc_system/data/test_qc_inspections.db"
-CSV_PATH = "/Users/doganozgur/.gemini/antigravity/scratch/smart_qc_system/data/test_report.csv"
+PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(PROJECT_ROOT, "data", "test_qc_inspections.db")
+CSV_PATH = os.path.join(PROJECT_ROOT, "data", "test_report.csv")
 
 
 def test_db():

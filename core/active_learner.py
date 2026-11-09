@@ -121,10 +121,10 @@ class ActiveLearner:
 
     def _format_learning_message(self, event_type: str, old_th: float, new_th: float) -> str:
         if event_type == "LEARN_OK_VARIATION":
-            return f"Yeni 'OK' ornegi ogrenildi. Benzer parca varyasyonlari artik tolerans dahilinde kabul edilecek (Esik: {old_th:.2f} -> {new_th:.2f})."
+            return f"Yeni 'OK' örneği öğrenildi. Benzer parça varyasyonları artık tolerans dahilinde kabul edilecek (Eşik: {old_th:.2f} -> {new_th:.2f})."
         elif event_type == "TIGHTEN_DEFECT_SENSITIVITY":
-            return f"Gozden kacan kusur ogrenildi. Model hassasiyeti artirildi (Esik: {old_th:.2f} -> {new_th:.2f})."
-        return "Karar onaylandi, istatistiklere eklendi."
+            return f"Gözden kaçan kusur öğrenildi. Model hassasiyeti artırıldı (Eşik: {old_th:.2f} -> {new_th:.2f})."
+        return "Karar onaylandı, istatistiklere eklendi."
 
     def get_stats(self) -> LearningStats:
         with sqlite3.connect(self.db_path) as conn:

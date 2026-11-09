@@ -31,7 +31,8 @@ except ImportError:
 from core.database import InspectionDatabase
 
 app = FastAPI(title="Industrial Vision QC PC Server with Ethernet IP Camera", version="2.0.0")
-MOCK_DIR = os.path.join(BASE_DIR, "mock_data")
+DOOR_HANDLE_DIR = os.path.join(BASE_DIR, "mock_data", "door_handles")
+MOCK_DIR = DOOR_HANDLE_DIR if os.path.exists(DOOR_HANDLE_DIR) else os.path.join(BASE_DIR, "mock_data")
 STORAGE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "storage")
 DB_PATH = os.path.join(BASE_DIR, "data", "qc_inspections.db")
 os.makedirs(STORAGE_DIR, exist_ok=True)

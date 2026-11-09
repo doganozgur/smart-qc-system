@@ -1,61 +1,72 @@
 # Smart Vision QC - Endüstriyel Kalite Kontrol & Sürekli Öğrenme Sistemi
 
-PC sunucusundan veri çeken, çok aşamalı görüntü işleme hattıyla (parça konumlama + altın referans "OK" modellerine göre failure/anomali tespiti + alt bileşen kontrolleri) çalışan, operatör arayüzüne sahip ve operatörün verdiği kararlardan sürekli öğrenen (Active Learning) akıllı kalite kontrol sistemi.
+PC sunucusundan veya harici kameralardan veri çeken, fotoğraf yükleyerek **altın referans "OK" modellerine** göre failure/anomali tespiti yapan, operatör arayüzüne sahip ve operatörün verdiği kararlardan anında öğrenen (**Human-in-the-Loop / Active Learning**) akıllı endüstriyel kalite kontrol sistemi.
+
+Sistem hem **Kapı Kolu (Door Handle)** hem de **Elektronik Kart (PCB)** parçalarını destekler.
+
+---
 
 ## 🚀 Mimari ve Özellikler
 
-1. **PC Sunucu & İstemci İletişimi (`server/` & `client/network_client.py`):**
-   - FastAPI tabanlı sunucu, konveyör kamera akışını (`/api/stream/next`), referans modelleri ve karar telemetrilerini sunar.
-   - İstemci sunucuya bağlıyken senkronize çalışır; sunucu çevrimdışıyken yerel test moduna kesintisiz geçer.
+1. **Girdi Esnekliği (Kamera veya Fotoğraf Yükleme):**
+   - Diskten tek tek veya toplu kapı kolu fotoğrafları yükleyip muayene edebilirsiniz (`📂 Resim Yükle & Muayene Et`).
+   - Yüklediğiniz hatasız bir fotoğrafı tek tıkla altın şablon yapabilirsiniz (`⭐ Bu Resmi Referans Olarak Öğret`).
+   - Harici Ethernet IP kameralar (RTSP / HTTP / GigE) ve konveyör simülasyonu desteklenir.
 
-2. **Aşama 1: Parça Konumlama ve Açı Düzeltme (`core/locator.py`):**
-   - Gelen ham kamera görüntüsünde parçayı arka plandan ayırır, yönlendirilmiş sınır kutusunu (Oriented Bounding Box - OBB) ve dönme açısını bulur.
-   - Parçayı standart referans koordinat düzlemine (500x350 piksel) perspektif dönüşümüyle hizalar.
+2. **Aşama 1: Parça Konumlama ve Açı Düzeltme (`core/door_handle_locator.py` & `core/locator.py`):**
+   - PCA (Principal Component Analysis) ve kontur momentleri ile dönme açısını alt-derece hassasiyetle hesaplar.
+   - Parçayı standart referans koordinat düzlemine (Kapı kolu: 600x300 piksel, PCB: 500x350 piksel) taşır ve rozet/uç yönelimini kanonik doğrultuya oturtur.
 
 3. **Aşama 2: "OK" Referans Tabanlı Failure & Anomali Tespiti (`core/golden_reference.py`):**
-   - Sistem yalnızca onaylanmış "OK" referans parçalarını temel alır.
-   - Gelen parçayı referans modelle çok ölçekli yapısal ve gradyan düzeyinde karşılaştırır.
-   - Çizik, çatlak, gözenek, leke veya eksik lehim gibi kusurları anomali ısı haritası (Heatmap) ve kusur kutucukları (Defect BBoxes) olarak çıkarır.
+   - Yalnızca onaylanmış "OK" referans parçalarını temel alır; morfolojik tolerans bandı ile mikro-titreşim ve ışık parlamalarını tolere eder.
+   - Çizik, çatlak, gözenek, kaplama lekesi veya darbe izlerini kusur ısı haritası (**Heatmap**) ve sınır kutucukları (**Defect BBoxes**) olarak çıkarır.
 
-4. **Aşama 3: Kural Tabanlı Alt Kontroller (`core/pipeline.py`):**
-   - 4 köşe montaj deliğinin sağlamlığı ve kontrastı.
-   - Merkezi mikrodenetleyici entegresinin (IC) yerleşimi ve varlığı.
+4. **Aşama 3: Kural Tabanlı Alt Muayene Kontrolleri (`core/door_handle_inspector.py`):**
+   - **Montaj Vida Delikleri (Üst & Alt):** Rozet üzerindeki vida deliklerinin varlığı, açık/kapalı durumu ve çapak tıkanıklığı.
+   - **Kare Mil Yuvası (Spindle Hole):** Kilit mekanizması mil yuvasının varlığı ve ölçüsel uygunluğu.
+   - **Kol Düzgünlüğü (Curvature / Bending):** Kol gövdesinin eğiklik, bükülme veya pres deformasyonlarının tespiti.
 
 5. **Aşama 4: Operatör Kararından Öğrenme (`core/active_learner.py`):**
-   - **Hatalı Ret Düzeltmesi (Model NOK dedi, Operatör OK dedi):** Sistem bu görüntüyü onaylı OK hafıza havuzuna ekler, benzer proses/ışık varyasyonlarını bir daha reddetmez.
+   - **Hatalı Ret Düzeltmesi (Model NOK dedi, Operatör OK dedi):** Sistem bu görüntüyü onaylı OK hafıza havuzuna ekler, benzer yüzey varyasyonlarını bir daha reddetmez.
    - **Hatalı Kabul Düzeltmesi (Model OK dedi, Operatör NOK dedi):** Modelin anomali hassasiyet eşiğini sıkılaştırır ve hatayı zor örnekler havuzuna kaydeder.
    - Tüm öğrenme adımları ve istatistikler SQLite veritabanında saklanır.
 
 ---
 
-## 🛠 Kurulum ve Çalıştırma
+## 🛠 Kurulum ve Testler
 
-### 1. Sanal Ortamı Aktifleştirme
+### 1. Testleri Çalıştırma
 ```bash
-cd /Users/doganozgur/.gemini/antigravity/scratch/smart_qc_system
-source .venv/bin/activate
+# Kapı Kolu Entegrasyon Testi
+./.venv/bin/python test_door_handle.py
+
+# Veritabanı ve PCB Testleri
+./.venv/bin/python test_pipeline.py
+./.venv/bin/python test_db.py
+./.venv/bin/python test_server.py
 ```
 
-### 2. Sentetik Test Verilerini Oluşturma
+### 2. Masaüstü Arayüzünü Başlatma
 ```bash
-python mock_data/generate_samples.py
+./run_client.sh
+# veya
+./.venv/bin/python client/app.py
 ```
 
-### 3. PC Sunucusunu Başlatma (Terminal 1)
+### 3. PC Sunucusunu Başlatma (İsteğe Bağlı)
 ```bash
-python server/server.py
+./run_server.sh
+# veya
+./.venv/bin/python server/server.py
 ```
 *Sunucu varsayılan olarak `http://localhost:8000` adresinde çalışır ve API dökümantasyonu `http://localhost:8000/docs` adresindedir.*
-
-### 4. Masaüstü Arayüzünü Başlatma (Terminal 2)
-```bash
-python client/app.py
-```
 
 ---
 
 ## 🖥 Arayüz Kılavuzu
+
+- **Mod Seçici:** Üst bardan **"🚪 Kapı Kolu Muayenesi"** veya **"🔲 Elektronik Kart (PCB)"** modları arasında geçiş yapabilirsiniz.
+- **📂 Resim Yükle & Muayene Et:** Bilgisayarınızdaki herhangi bir kapı kolu fotoğrafını seçerek anında muayene edin.
+- **⭐ Bu Resmi Referans Olarak Öğret:** Ekranda incelediğiniz veya diskten seçeceğiniz hatasız kapı kolunu altın referans modeli olarak kaydedin.
 - **Görüntü Modları:** Ham kamera görüntüsü, hizalanmış parça (ROI), veya kusur ısı haritası (Heatmap Composite) arasında geçiş yapın.
-- **Sonraki Parçayı Muayene Et:** Sunucudan sıradaki parçayı çeker ve milisaniyeler içinde OK / NOT OK kararını üretir.
-- **Otomatik Akış:** Konveyör bandı simülasyonuyla parçaları aralıksız otomatik denetler.
 - **Kararı Düzelt:** Model bir parçada yanıldığında tek tuşla müdahale edin; sistem geri bildiriminizden derhal öğrenir.

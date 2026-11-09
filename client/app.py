@@ -5,6 +5,9 @@ Main Desktop Application Launcher for Vision QC System.
 import sys
 import os
 
+# Fix GNOME / GLib gsettings schema crash on Ubuntu
+os.environ.setdefault("QT_QPA_PLATFORMTHEME", "generic")
+
 # Ensure project root is in sys.path
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:

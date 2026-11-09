@@ -2,13 +2,15 @@
 Golden Reference Failure Detector.
 Trained on 'OK' reference samples to detect deviations, anomalies, and failures:
 - Morphological tolerance banding for micro-vibration invariance
+- Fine sub-pixel alignment (ECC) for high-precision comparison
+- Part-aware mask (evaluates defects only on the physical component)
 - Multi-channel color & edge anomaly extraction
 - Pixel-level defect heatmap generation and defect localization (BBoxes)
 - Memory bank adaptation for learning from operator approvals
 """
 
 from dataclasses import dataclass, field
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 import cv2
 import numpy as np
 
@@ -42,12 +44,14 @@ class GoldenReferenceFailureDetector:
         self.ok_memory_bank: List[np.ndarray] = []
         self.dilated_ref: Optional[np.ndarray] = None
         self.eroded_ref: Optional[np.ndarray] = None
+        self.part_mask: Optional[np.ndarray] = None
         self.kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (7, 7))
 
-    def set_golden_reference(self, reference_img: np.ndarray):
+    def set_golden_reference(self, reference_img: np.ndarray, part_mask: Optional[np.ndarray] = None):
         self.golden_references = [reference_img.copy()]
         self.dilated_ref = cv2.dilate(reference_img, self.kernel)
         self.eroded_ref = cv2.erode(reference_img, self.kernel)
+        self.part_mask = part_mask
         self.learn_ok_variation(reference_img)
 
     def learn_ok_variation(self, ok_img: np.ndarray):
@@ -73,13 +77,28 @@ class GoldenReferenceFailureDetector:
         h, w = ref.shape[:2]
         test = cv2.resize(aligned_part, (w, h))
 
+        # Sub-pixel fine registration via ECC (translation + rotation)
+        try:
+            warp_matrix = np.eye(2, 3, dtype=np.float32)
+            criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 15, 1e-3)
+            gray_ref = cv2.cvtColor(ref, cv2.COLOR_BGR2GRAY)
+            gray_test = cv2.cvtColor(test, cv2.COLOR_BGR2GRAY)
+            _, warp_matrix = cv2.findTransformECC(gray_ref, gray_test, warp_matrix, cv2.MOTION_EUCLIDEAN, criteria)
+            test = cv2.warpAffine(test, warp_matrix, (w, h), flags=cv2.INTER_LINEAR + cv2.WARP_INVERSE_MAP, borderValue=(28, 30, 32))
+        except Exception:
+            pass
+
         # Morphological tolerance band difference
         over = np.maximum(0, test.astype(np.int16) - self.dilated_ref.astype(np.int16))
         under = np.maximum(0, self.eroded_ref.astype(np.int16) - test.astype(np.int16))
         band_diff = np.maximum(over, under).astype(np.uint8)
 
-        # Max difference across color channels (captures color stains, dark holes, bright scratches)
+        # Max difference across color channels
         diff_max_ch = np.max(band_diff, axis=2)
+
+        # Restrict inspection strictly to the part body (ignore outside conveyor belt)
+        if self.part_mask is not None:
+            diff_max_ch = (diff_max_ch.astype(np.float32) * self.part_mask).astype(np.uint8)
 
         # Mask of defect pixels (diff > 25 on 0-255 scale)
         defect_mask = (diff_max_ch > 25).astype(np.uint8) * 255
@@ -89,8 +108,8 @@ class GoldenReferenceFailureDetector:
         defect_clean = cv2.morphologyEx(defect_mask, cv2.MORPH_OPEN, clean_kernel)
 
         defect_pixel_count = np.sum(defect_clean > 0)
-        # Anomaly score normalized: 0 pixels -> 0.0, 500+ pixels -> 1.0
-        anomaly_score = float(np.clip(defect_pixel_count / 400.0, 0.0, 1.0))
+        # Anomaly score normalized: 0 pixels -> 0.0, 400+ pixels -> 1.0
+        anomaly_score = float(np.clip(defect_pixel_count / 350.0, 0.0, 1.0))
 
         is_ok = anomaly_score < self.threshold
         dist = abs(anomaly_score - self.threshold)
@@ -101,10 +120,10 @@ class GoldenReferenceFailureDetector:
         defect_regions: List[DefectBBox] = []
         for cnt in contours:
             area = cv2.contourArea(cnt)
-            if area >= 30:  # Minimum meaningful defect cluster
+            if area >= 25:  # Minimum meaningful defect cluster
                 bx, by, bw, bh = cv2.boundingRect(cnt)
                 crop_diff = diff_max_ch[by:by + bh, bx:bx + bw]
-                severity = float(np.max(crop_diff) / 255.0)
+                severity = float(np.max(crop_diff) / 255.0) if crop_diff.size > 0 else 0.5
                 dtype = "Surface Scratch / Crack" if (bw > 2.2 * bh or bh > 2.2 * bw) else "Defect / Anomaly"
                 defect_regions.append(DefectBBox(x=bx, y=by, w=bw, h=bh, severity=round(severity, 2), defect_type=dtype))
 
@@ -129,9 +148,9 @@ class GoldenReferenceFailureDetector:
             )
 
         summary = (
-            "Tum alanlar 'OK' referansi ile uyumlu."
+            "Tüm alanlar 'OK' referansı ile uyumlu."
             if is_ok
-            else f"FAILURE: {len(defect_regions)} bolgede OK sablonundan sapma tespit edildi ({defect_pixel_count} kusurlu piksel)."
+            else f"HATALI: {len(defect_regions)} bölgede OK şablonundan sapma tespit edildi ({defect_pixel_count} kusurlu piksel)."
         )
 
         return InspectionResult(
