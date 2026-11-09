@@ -1,72 +1,128 @@
-# Smart Vision QC - Endüstriyel Kalite Kontrol & Sürekli Öğrenme Sistemi
+# Smart Vision QC - Industrial Quality Control & Active Learning System
 
-PC sunucusundan veya harici kameralardan veri çeken, fotoğraf yükleyerek **altın referans "OK" modellerine** göre failure/anomali tespiti yapan, operatör arayüzüne sahip ve operatörün verdiği kararlardan anında öğrenen (**Human-in-the-Loop / Active Learning**) akıllı endüstriyel kalite kontrol sistemi.
+An intelligent, computer vision-based quality control (QC) desktop application engineered for industrial manufacturing lines. It performs automated defect and anomaly detection against **golden "OK" references**, features a modern operator interface, and continuously improves from operator feedback via **Human-in-the-Loop Active Learning**.
 
-Sistem hem **Kapı Kolu (Door Handle)** hem de **Elektronik Kart (PCB)** parçalarını destekler.
-
----
-
-## 🚀 Mimari ve Özellikler
-
-1. **Girdi Esnekliği (Kamera veya Fotoğraf Yükleme):**
-   - Diskten tek tek veya toplu kapı kolu fotoğrafları yükleyip muayene edebilirsiniz (`📂 Resim Yükle & Muayene Et`).
-   - Yüklediğiniz hatasız bir fotoğrafı tek tıkla altın şablon yapabilirsiniz (`⭐ Bu Resmi Referans Olarak Öğret`).
-   - Harici Ethernet IP kameralar (RTSP / HTTP / GigE) ve konveyör simülasyonu desteklenir.
-
-2. **Aşama 1: Parça Konumlama ve Açı Düzeltme (`core/door_handle_locator.py` & `core/locator.py`):**
-   - PCA (Principal Component Analysis) ve kontur momentleri ile dönme açısını alt-derece hassasiyetle hesaplar.
-   - Parçayı standart referans koordinat düzlemine (Kapı kolu: 600x300 piksel, PCB: 500x350 piksel) taşır ve rozet/uç yönelimini kanonik doğrultuya oturtur.
-
-3. **Aşama 2: "OK" Referans Tabanlı Failure & Anomali Tespiti (`core/golden_reference.py`):**
-   - Yalnızca onaylanmış "OK" referans parçalarını temel alır; morfolojik tolerans bandı ile mikro-titreşim ve ışık parlamalarını tolere eder.
-   - Çizik, çatlak, gözenek, kaplama lekesi veya darbe izlerini kusur ısı haritası (**Heatmap**) ve sınır kutucukları (**Defect BBoxes**) olarak çıkarır.
-
-4. **Aşama 3: Kural Tabanlı Alt Muayene Kontrolleri (`core/door_handle_inspector.py`):**
-   - **Montaj Vida Delikleri (Üst & Alt):** Rozet üzerindeki vida deliklerinin varlığı, açık/kapalı durumu ve çapak tıkanıklığı.
-   - **Kare Mil Yuvası (Spindle Hole):** Kilit mekanizması mil yuvasının varlığı ve ölçüsel uygunluğu.
-   - **Kol Düzgünlüğü (Curvature / Bending):** Kol gövdesinin eğiklik, bükülme veya pres deformasyonlarının tespiti.
-
-5. **Aşama 4: Operatör Kararından Öğrenme (`core/active_learner.py`):**
-   - **Hatalı Ret Düzeltmesi (Model NOK dedi, Operatör OK dedi):** Sistem bu görüntüyü onaylı OK hafıza havuzuna ekler, benzer yüzey varyasyonlarını bir daha reddetmez.
-   - **Hatalı Kabul Düzeltmesi (Model OK dedi, Operatör NOK dedi):** Modelin anomali hassasiyet eşiğini sıkılaştırır ve hatayı zor örnekler havuzuna kaydeder.
-   - Tüm öğrenme adımları ve istatistikler SQLite veritabanında saklanır.
+The system natively supports both **Door Handles** (casting, rosette holes, spindle aperture, straightness) and **Printed Circuit Boards (PCBs)**.
 
 ---
 
-## 🛠 Kurulum ve Testler
+## 🚀 Key Features & Pipeline Architecture
 
-### 1. Testleri Çalıştırma
-```bash
-# Kapı Kolu Entegrasyon Testi
-./.venv/bin/python test_door_handle.py
-
-# Veritabanı ve PCB Testleri
-./.venv/bin/python test_pipeline.py
-./.venv/bin/python test_db.py
-./.venv/bin/python test_server.py
+```
+[Camera / Image Upload]
+         │
+         ▼
+[Stage 1: PCA Alignment & Canonical Normalization]
+         │
+         ▼
+[Stage 2: Golden Reference Anomaly Detection (Heatmap)]
+         │
+         ▼
+[Stage 3: Rule-Based Feature Sub-Inspections]
+         │
+         ▼
+[Stage 4: Human-in-the-Loop Active Learning & SQLite Audit Trail]
 ```
 
-### 2. Masaüstü Arayüzünü Başlatma
+### 1. Flexible Input Acquisition
+- **Image File Upload (`📂 Upload Image & Inspect`):** Upload single or batch photos of parts directly from disk.
+- **Golden Teaching (`⭐ Teach This Image as Golden Reference`):** Register any defect-free part as the active golden reference with a single click.
+- **Industrial Camera Integration:** Connects to Ethernet IP cameras (RTSP / HTTP snapshot / TCP socket triggers / GigE) and simulated conveyor feeds.
+
+### 2. Stage 1: Part Localization & Orientation Correction (`core/door_handle_locator.py` & `core/locator.py`)
+- Computes rotation angle with sub-degree precision using **Principal Component Analysis (PCA)** and contour moments.
+- Normalizes parts to a canonical coordinate frame (Door handles: 600×300 px, PCBs: 500×350 px) and aligns the rosette / handle orientation.
+
+### 3. Stage 2: Golden Reference Failure & Anomaly Detection (`core/golden_reference.py`)
+- Compares aligned parts against verified "OK" references using dynamic morphological tolerance bands to prevent false positives from micro-vibrations or lighting shifts.
+- Detects scratches, cracks, porosity, plating blemishes, and impact dents, generating an **anomaly heatmap** and bounding boxes around defect regions.
+
+### 4. Stage 3: Rule-Based Feature Sub-Inspections (`core/door_handle_inspector.py`)
+- **Mounting Screw Holes (Top & Bottom):** Verifies rosette hole presence, shape integrity, and detects burr or swarf blockage.
+- **Square Spindle Hole:** Checks existence, location, and dimensions of the spindle drive aperture.
+- **Lever Curvature & Straightness:** Evaluates bending, deflection, or stamping deformation along the handle body.
+
+### 5. Stage 4: Operator Feedback & Active Learning (`core/active_learner.py`)
+- **False Rejection Correction (Model: NOK ➔ Operator: OK):** Adds the approved sample to the golden memory bank to tolerate similar surface variations without false alarms.
+- **False Acceptance Correction (Model: OK ➔ Operator: NOK):** Automatically tightens the anomaly threshold and commits the hard negative to the training repository.
+- Complete audit trail with timestamps, operator overrides, anomaly scores, and CSV export powered by an embedded SQLite database.
+
+---
+
+## 🛠 Installation & Quick Start
+
+### Prerequisites
+- Python 3.10+ (tested on Python 3.11 and 3.14)
+- OpenCV, PySide6, SciPy, Scikit-learn, NumPy
+
+### Setup Environment
+```bash
+# Clone the repository
+git clone https://github.com/doganozgur/smart-qc-system.git
+cd smart-qc-system
+
+# Create and activate virtual environment
+python3 -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+---
+
+## 🧪 Running Tests
+
+Verify the complete inspection pipeline and unit tests:
+
+```bash
+# Door Handle End-to-End Pipeline & Active Learning Test
+python test_door_handle.py
+
+# Golden Reference & PCB Pipeline Tests
+python test_pipeline.py
+
+# Database Logging & CSV Export Test
+python test_db.py
+
+# REST API Server Test
+python test_server.py
+```
+
+---
+
+## 🖥 Launching the Desktop Application
+
+### Linux
 ```bash
 ./run_client.sh
-# veya
-./.venv/bin/python client/app.py
+# or directly:
+python client/app.py
 ```
 
-### 3. PC Sunucusunu Başlatma (İsteğe Bağlı)
-```bash
-./run_server.sh
-# veya
-./.venv/bin/python server/server.py
+### Windows (Pre-built Executable)
+1. Download **`SmartVisionQC-Windows.zip`** from the latest run on the [GitHub Actions tab](https://github.com/doganozgur/smart-qc-system/actions).
+2. Right-click and choose **Extract All**.
+3. Double-click **`RUN.bat`** or **`SmartVisionQC.exe`**.
+
+### Building the Windows Executable from Source
+```cmd
+python build_windows_exe.py
 ```
-*Sunucu varsayılan olarak `http://localhost:8000` adresinde çalışır ve API dökümantasyonu `http://localhost:8000/docs` adresindedir.*
+This generates a standalone, portable bundle with a helper launcher in `dist/SmartVisionQC/` and an archive `dist/SmartVisionQC-Windows.zip`.
 
 ---
 
-## 🖥 Arayüz Kılavuzu
+## 🌐 Optional: Edge/Server Mode
+Run the standalone FastAPI backend for distributed camera processing or remote QC telemetry:
 
-- **Mod Seçici:** Üst bardan **"🚪 Kapı Kolu Muayenesi"** veya **"🔲 Elektronik Kart (PCB)"** modları arasında geçiş yapabilirsiniz.
-- **📂 Resim Yükle & Muayene Et:** Bilgisayarınızdaki herhangi bir kapı kolu fotoğrafını seçerek anında muayene edin.
-- **⭐ Bu Resmi Referans Olarak Öğret:** Ekranda incelediğiniz veya diskten seçeceğiniz hatasız kapı kolunu altın referans modeli olarak kaydedin.
-- **Görüntü Modları:** Ham kamera görüntüsü, hizalanmış parça (ROI), veya kusur ısı haritası (Heatmap Composite) arasında geçiş yapın.
-- **Kararı Düzelt:** Model bir parçada yanıldığında tek tuşla müdahale edin; sistem geri bildiriminizden derhal öğrenir.
+```bash
+python server/server.py
+```
+- API Base URL: `http://localhost:8000`
+- Interactive Swagger Documentation: `http://localhost:8000/docs`
+
+---
+
+## 📄 License
+This project is licensed under the MIT License.
