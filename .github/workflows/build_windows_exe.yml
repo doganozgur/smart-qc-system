@@ -29,6 +29,7 @@ jobs:
     - name: Generate Synthetic Mock Data
       run: |
         python mock_data/generate_samples.py
+        python mock_data/generate_door_handle_samples.py
 
     - name: Build Executable with PyInstaller
       run: |
@@ -37,5 +38,5 @@ jobs:
     - name: Upload Windows Executable Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: SmartVisionQC-Windows-EXE
+        name: SmartVisionQC-Windows
         path: dist/SmartVisionQC/

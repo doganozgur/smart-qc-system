@@ -11,6 +11,7 @@ Features:
 """
 
 import os
+import sys
 import time
 import cv2
 import numpy as np
@@ -191,13 +192,35 @@ class MainWindow(QMainWindow):
     def __init__(self, project_dir: str):
         super().__init__()
         self.project_dir = project_dir
+        
+        # Ensure data directory exists for database storage with user home fallback
+        self.data_dir = os.path.join(project_dir, "data")
+        try:
+            os.makedirs(self.data_dir, exist_ok=True)
+            test_probe = os.path.join(self.data_dir, ".probe")
+            with open(test_probe, "w") as f:
+                f.write("probe")
+            os.remove(test_probe)
+        except Exception:
+            user_home = os.path.expanduser("~")
+            self.data_dir = os.path.join(user_home, ".smartvisionqc", "data")
+            os.makedirs(self.data_dir, exist_ok=True)
+
+        self.db_path = os.path.join(self.data_dir, "qc_inspections.db")
+
+        # Resolve asset directories with PyInstaller _MEIPASS fallback
+        bundle_dir = getattr(sys, "_MEIPASS", project_dir)
         self.door_handle_mock_dir = os.path.join(project_dir, "mock_data", "door_handles")
+        if not os.path.exists(self.door_handle_mock_dir) and os.path.exists(os.path.join(bundle_dir, "mock_data", "door_handles")):
+            self.door_handle_mock_dir = os.path.join(bundle_dir, "mock_data", "door_handles")
+
         self.pcb_mock_dir = os.path.join(project_dir, "mock_data")
+        if not os.path.exists(self.pcb_mock_dir) and os.path.exists(os.path.join(bundle_dir, "mock_data")):
+            self.pcb_mock_dir = os.path.join(bundle_dir, "mock_data")
 
         # Default mode is door handle inspection
         self.current_mode = "door_handle"
         self.mock_dir = self.door_handle_mock_dir if os.path.exists(self.door_handle_mock_dir) else self.pcb_mock_dir
-        self.db_path = os.path.join(project_dir, "data", "qc_inspections.db")
         self.golden_path = os.path.join(self.mock_dir, "golden_reference.png")
 
         # Core Engines & Database
